@@ -1,18 +1,46 @@
 const express = require("express");
+const { z } = require("zod");
+require("dotenv").config();
+
+const mongoose = require("mongoose");
+const uri = process.env.MONGODB_URI;
+const PORT = process.env.PORT;
 
 const app = express();
 
-const { z } = require("zod");
+
+//connect to db
+
+const noteDbSchema = new mongoose.Schema(
+    {
+    title: {
+        type: String,
+        required: true,
+        trim: true,
+        minLength: 2,
+        maxLength: 30,
+    },
+    description: {
+        type: String,
+        default: "No description added",
+    },
+    },
+    {
+        timestamps: true
+    }
+);
+
+const Notes = mongoose.model("Notes", noteDbSchema)
+
 
 //we Prepare a validation schema that defines the expected input format.
 const noteSchema = z.object({
-    title: z.string().min(1).max(30),
-    description: z.string().min(10).max(100)
+    title: z.string().trim().min(2).max(30),
+    description: z.string().trim().optional()
 })
 
 
 //  Let's create a Zod validation middleware.
-
 function validateBody(schema){
     return (req, res, next) => {
         const result = schema.safeParse(req.body);
@@ -21,7 +49,10 @@ function validateBody(schema){
             return res.status(400).json({
                 success: false,
                 message: "Invalid inputs provided.",
-                error: result.error.issues
+                errors: result.error.issues.map((issue) => ({
+                    field: issue.path.join("."),
+                    message: issue.message
+                })),
             })
         }
         req.body = result.data
@@ -29,10 +60,9 @@ function validateBody(schema){
     }
 }
 
-
 app.use(express.json()) //imp middleware to parse/read the json requests 
 
-let notes = [];
+// let notes = [];
 
 app.get("/about", (req, res) => {
     res.status(200).send("<h1>Hello there...</h1>")
@@ -41,52 +71,58 @@ app.get("/about", (req, res) => {
 
 //get endpoints to fetch all the notes
 
-app.get("/notes", (req, res) => {
+app.get("/notes", async (req, res) => {
+    const notes = await Notes.find({})
+                    .select("title description -_id").lean()
+                    .sort({createdAt: -1}) //all notes
+    const data = {title: notes.title, data: notes.description}
     res.status(200).json({
         success: true,
-        notes: notes,
         message: "Notes fetched successfully",
-        data: null
+        data: notes
     })
 })
 
 
 //post
-app.post("/notes", validateBody(noteSchema) ,(req, res) => {
+app.post("/notes", validateBody(noteSchema) ,async (req, res) => {
     //let add a little safety checks
-    const {title, description} = req.body || {};
+    const {title, description} = req.body;
     
-    // if (typeof title !== "string" || typeof description !== "string"){
-    //     return res.status(400).json({
-    //         success: false,
-    //         message: "No title and description received",
-    //         data: null
-    //     })
-    // }
-    let newNote = {id: Number(Date.now()), title, description};
-
-    notes.push(newNote);
+    // let newNote = {id: Number(Date.now()), title, description}; id automatically get's added to mongo
+    let result = await Notes.create(
+        {
+            title, description
+        }
+    )
 
     res.status(201).json({
         success: true,
         message: "Notes Created",
-        data: newNote
+        data: result.title
     })
 })
+
+
+
+
+
+///// need to fix these endpoints
+
 
 //query search filtering
 
 app.get("/notes/search", (req, res) => {
     const title = req.query.title;
 
-    if(typeof title !== "string") {
+    if (typeof title !== "string") {
         return res.status(404).json({
             success: false,
             message: "Provide a valid title."
         })
     }
 
-    const filteredNotes = notes.filter( (note) => 
+    const filteredNotes = notes.filter((note) =>
         typeof note.title === "string" && note.title.toLowerCase().includes(title.toLowerCase())
     )
 
@@ -100,7 +136,7 @@ app.get("/notes/search", (req, res) => {
 
 app.get("/notes/:id", (req, res) => {
     const id = Number(req.params.id);
-    if(!Number.isInteger(id) || id<0) {
+    if (!Number.isInteger(id) || id < 0) {
         return res.status(404).json({
             success: false,
             message: "Invalid id, no notes found"
@@ -126,8 +162,8 @@ app.put("/notes/:id", (req, res) => {
         })
     }
 
-    const {title, description} = req.body;
-    
+    const { title, description } = req.body;
+
     //have to find the index ig
     const index = notes.findIndex(n => n.id == id)
     if (index === -1) {
@@ -138,11 +174,11 @@ app.put("/notes/:id", (req, res) => {
         })
     }
     // const index = notes.indexOf(notes.filter(n=>n.id == id)[0])
-    notes[index] = {title, description, id: id};
+    notes[index] = { title, description, id: id };
 
     return res.status(200).json({
         success: true,
-        message: "Note updated successfully.", 
+        message: "Note updated successfully.",
         data: `Updated note: ${notes[index]}`
     })
 
@@ -158,9 +194,9 @@ app.patch("/notes/:id", (req, res) => {
         })
     }
 
-    const {title, description} = req.body;
+    const { title, description } = req.body;
     let toUpdate = null;
-    
+
     if (title === undefined && description === undefined) {
         return res.status(400).json({
             success: false,
@@ -193,7 +229,7 @@ app.patch("/notes/:id", (req, res) => {
 
 app.delete("/notes/:id", (req, res) => {
     const id = Number(req.params.id);
-    if(!Number.isInteger(id) || id<0 ){
+    if (!Number.isInteger(id) || id < 0) {
         return res.status(404).json({
             success: false,
             message: "It does not exist."
@@ -224,8 +260,21 @@ app.delete("/notes/:id", (req, res) => {
 
 
 
+async function startServer() {
+    try {
+        if(!uri) {
+            throw new Error("MONGODB_URI environment variable is missing.")
+        }
+        await mongoose.connect(uri);
+        console.log("Connected to MongoDB successfully");
+        
+        app.listen(PORT, () => {
+            console.log(`Server listening on http://localhost:${PORT}`);
+        })
+    } catch(err) {
+        console.error("Initialization failed:", err.message);
+        process.exit(1);
+    }
+}
 
-app.listen(3000, () => {
-    console.log(`Running on http://localhost:3000`);
-    
-})
+startServer()
