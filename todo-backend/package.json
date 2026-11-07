@@ -1,0 +1,32 @@
+{
+  "name": "todo-backend",
+  "version": "1.0.0",
+  "description": "Basic implementation of backend APIs for a to‑do app (REST APIs).",
+  "keywords": [
+    "rest-api",
+    "express",
+    "js",
+    "backend"
+  ],
+  "homepage": "https://github.com/pritam-swe/100xdevs-WinterCamp/tree/main#readme",
+  "bugs": {
+    "url": "https://github.com/pritam-swe/100xdevs-WinterCamp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pritam-swe/100xdevs-WinterCamp.git#main"
+  },
+  "license": "ISC",
+  "author": "Pritam",
+  "type": "commonjs",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "npm run dev"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "mongoose": "^9.12.0",
+    "zod": "^4.6.7"
+  }
+}
