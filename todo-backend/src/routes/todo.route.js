@@ -1,20 +1,26 @@
 const express = require("express");
 const router = express.Router();
 const TODO = require("../models/todo.model");
+const {getAllTodoHandler, getTodoByIdHandler} = require("../controllers/getTodoHandlers");
+const { validateInput } = require("../middlewares/validation.middleware");
 
-router.get("/", (req, res) => {
-    res.status(200).send("<h1>Welcome to the Notes backend APIs</h1>")
-});
+const {createTodoHandler, updateTodoHandler} = require("../controllers/createUpdateTodos")
+
+const { createTodoSchema, updateTodoSchema, updateTitleSchema } = require("../schemas/todo.schema");
+
+const {changeTitleHandler, toggleCompletionStatus} = require("../controllers/patchHandler")
+
+const {deleteTodoHandler} = require("../controllers/deleteHandler");
+
+router.get("/", getAllTodoHandler);
+router.get("/:id", getTodoByIdHandler);
+
+router.post("/", validateInput(createTodoSchema) ,createTodoHandler)
+router.put("/:id", validateInput(updateTodoSchema) ,updateTodoHandler);
+
+router.patch("/:id", validateInput(updateTitleSchema), changeTitleHandler)
+router.patch("/:id/done", toggleCompletionStatus);
 
 
-router.get("/api/todos", async (req, res) => {
-    const tasks = await TODO.find({}).select("title description"-_id);
-    res.status(200).json({
-        success: true,
-        message: "All notes fetched",
-        data: tasks
-    })
-});
-
-
+router.delete("/:id", deleteTodoHandler)
 module.exports = router;

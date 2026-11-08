@@ -13,4 +13,9 @@ const updateTodoSchema = z.object({
     description: z.string().trim().min(1)   //required for put
 })
 
-module.exports = {createTodoSchema, updateTodoSchema};
+
+const updateTitleSchema = z.object({
+    title: z.string().trim().min(3).max(50)
+})
+
+module.exports = {createTodoSchema, updateTodoSchema, updateTitleSchema};
