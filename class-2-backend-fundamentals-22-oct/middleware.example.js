@@ -10,8 +10,6 @@ function checkAge(req, res, next){
     }
 
     next();
-
-
 }
 
 app.get("/restricted", checkAge, (req, res) => {
